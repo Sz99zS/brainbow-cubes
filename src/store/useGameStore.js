@@ -181,6 +181,9 @@ function writeCellsToGrid(cells, card, x, y) {
   return newCells;
 }
 
+// Экспортируем для Board — он вызывает проверку при каждом движении мыши
+export { isValidMove as checkValidMove };
+
 // =============================================
 // ZUSTAND STORE
 // =============================================

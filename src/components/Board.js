@@ -1,15 +1,18 @@
 'use client';
 
 import { useRef, useState, useCallback, useLayoutEffect } from 'react';
-import { useGameStore } from '@/store/useGameStore';
+import { useGameStore, checkValidMove } from '@/store/useGameStore';
 import { COLOR_HEX } from '@/data/deck';
 import styles from './Board.module.css';
 
 const CELL = 60; // размер одной ячейки в px
 
+// Порог в пикселях: если мышь сдвинулась меньше — это клик, иначе — перетаскивание
+const DRAG_THRESHOLD = 5;
+
 export default function Board() {
   const placedCards = useGameStore((s) => s.placedCards);
-  const validPlacements = useGameStore((s) => s.validPlacements);
+  const cells = useGameStore((s) => s.cells);
   const selectedCardIndex = useGameStore((s) => s.selectedCardIndex);
   const players = useGameStore((s) => s.players);
   const currentPlayerIndex = useGameStore((s) => s.currentPlayerIndex);
@@ -29,16 +32,17 @@ export default function Board() {
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0 });
   const panOrigin = useRef({ x: 0, y: 0 });
+  // Суммарное расстояние drag'а — для отличия клика от перетаскивания
+  const dragDistance = useRef(0);
 
-  // Hover-позиция для ghost-превью
-  const [hoverSlot, setHoverSlot] = useState(null);
+  // === GHOST: позиция призрака в игровых координатах ===
+  const [ghostPos, setGhostPos] = useState(null); // { gx, gy, valid }
 
   // Центрирование при первом рендере
   const initialized = useRef(false);
   useLayoutEffect(() => {
     if (!initialized.current && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      // Центрируем так, чтобы (0,0) карта была примерно в центре экрана
       setPan({
         x: rect.width / 2 - CELL,
         y: rect.height / 2 - CELL,
@@ -50,27 +54,83 @@ export default function Board() {
   // Popup очков — уникальный ключ для перезапуска CSS-анимации
   const popupKey = placedCards.length;
 
+  // --- Конвертация пикселей мыши → игровых координат ---
+  // Привязка к сетке с шагом в 1 ячейку (не 2!), курсор в центре карты 2×2
+  const mouseToGrid = useCallback(
+    (clientX, clientY) => {
+      if (!containerRef.current) return null;
+      const rect = containerRef.current.getBoundingClientRect();
+
+      // Позиция на экране → позиция внутри трансформ-слоя
+      const layerX = (clientX - rect.left - pan.x) / zoom;
+      const layerY = (clientY - rect.top - pan.y) / zoom;
+
+      // Привязываем к сетке; смещаем на -1, чтобы курсор был в центре карты 2×2
+      // toScreen: left = gx * CELL, top = -gy * CELL
+      const gx = Math.round(layerX / CELL) - 1;
+      const gy = -(Math.round(layerY / CELL) - 1);
+
+      return { gx, gy };
+    },
+    [pan, zoom]
+  );
+
   // --- ОБРАБОТЧИКИ МЫШИ ---
-  const handleMouseDown = useCallback((e) => {
-    // Только ЛКМ
-    if (e.button !== 0) return;
-    isPanning.current = true;
-    panStart.current = { x: e.clientX, y: e.clientY };
-    panOrigin.current = { ...pan };
-  }, [pan]);
+  const handleMouseDown = useCallback(
+    (e) => {
+      if (e.button !== 0) return;
+      isPanning.current = true;
+      dragDistance.current = 0;
+      panStart.current = { x: e.clientX, y: e.clientY };
+      panOrigin.current = { ...pan };
+    },
+    [pan]
+  );
 
-  const handleMouseMove = useCallback((e) => {
-    if (!isPanning.current) return;
-    const dx = e.clientX - panStart.current.x;
-    const dy = e.clientY - panStart.current.y;
-    setPan({
-      x: panOrigin.current.x + dx,
-      y: panOrigin.current.y + dy,
-    });
-  }, []);
+  const handleMouseMove = useCallback(
+    (e) => {
+      // --- Перетаскивание поля ---
+      if (isPanning.current) {
+        const dx = e.clientX - panStart.current.x;
+        const dy = e.clientY - panStart.current.y;
+        dragDistance.current = Math.max(dragDistance.current, Math.abs(dx) + Math.abs(dy));
+        setPan({
+          x: panOrigin.current.x + dx,
+          y: panOrigin.current.y + dy,
+        });
+      }
 
-  const handleMouseUp = useCallback(() => {
+      // --- Ghost-превью: обновляем позицию при каждом движении мыши ---
+      if (selectedCard) {
+        const grid = mouseToGrid(e.clientX, e.clientY);
+        if (grid) {
+          // Проверяем валидность позиции через экспортированную чистую функцию
+          const valid = checkValidMove(cells, grid.gx, grid.gy);
+          setGhostPos({ gx: grid.gx, gy: grid.gy, valid });
+        }
+      }
+    },
+    [selectedCard, cells, mouseToGrid]
+  );
+
+  const handleMouseUp = useCallback(
+    (e) => {
+      const wasDragging = dragDistance.current > DRAG_THRESHOLD;
+      isPanning.current = false;
+
+      // Если это был клик (не перетаскивание) и есть выбранная карта — ставим!
+      if (!wasDragging && selectedCard && ghostPos?.valid) {
+        placeCard(ghostPos.gx, ghostPos.gy);
+        setGhostPos(null);
+      }
+    },
+    [selectedCard, ghostPos, placeCard]
+  );
+
+  // При уходе мыши с поля — скрываем ghost
+  const handleMouseLeave = useCallback(() => {
     isPanning.current = false;
+    setGhostPos(null);
   }, []);
 
   const handleWheel = useCallback((e) => {
@@ -81,18 +141,7 @@ export default function Board() {
     });
   }, []);
 
-  // Клик по валидной позиции — размещаем карту
-  const handleSlotClick = useCallback(
-    (x, y, e) => {
-      e.stopPropagation();
-      if (selectedCard) {
-        placeCard(x, y);
-      }
-    },
-    [selectedCard, placeCard]
-  );
-
-  // Конвертация игровых координат в экранные пиксели
+  // Конвертация игровых координат → экранные пиксели
   // y инвертируется: в игре y вверх, на экране y вниз
   const toScreen = (gx, gy) => ({
     left: gx * CELL,
@@ -102,11 +151,11 @@ export default function Board() {
   return (
     <div
       ref={containerRef}
-      className={styles.boardContainer}
+      className={`${styles.boardContainer} ${selectedCard ? styles.placingMode : ''}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
       onWheel={handleWheel}
     >
       {/* Трансформируемый слой */}
@@ -123,12 +172,7 @@ export default function Board() {
             <div
               key={card.id}
               className={styles.placedCard}
-              style={{
-                left,
-                top,
-                width: CELL * 2,
-                height: CELL * 2,
-              }}
+              style={{ left, top, width: CELL * 2, height: CELL * 2 }}
             >
               <div className={styles.placedCell} style={{ width: CELL, height: CELL, top: 0, left: 0, backgroundColor: COLOR_HEX[card.colors.tl] }} />
               <div className={styles.placedCell} style={{ width: CELL, height: CELL, top: 0, left: CELL, backgroundColor: COLOR_HEX[card.colors.tr] }} />
@@ -138,34 +182,13 @@ export default function Board() {
           );
         })}
 
-        {/* Валидные позиции (показываем, только если выбрана карта) */}
-        {selectedCard &&
-          validPlacements.map(({ x, y }) => {
-            const { left, top } = toScreen(x, y);
-            return (
-              <div
-                key={`slot-${x}-${y}`}
-                className={styles.validSlot}
-                style={{
-                  left,
-                  top,
-                  width: CELL * 2,
-                  height: CELL * 2,
-                }}
-                onClick={(e) => handleSlotClick(x, y, e)}
-                onMouseEnter={() => setHoverSlot({ x, y })}
-                onMouseLeave={() => setHoverSlot(null)}
-              />
-            );
-          })}
-
-        {/* Ghost-превью карты при наведении */}
-        {selectedCard && hoverSlot && (
+        {/* Ghost-превью: следует за мышью, привязан к сетке с шагом 1 ячейка */}
+        {selectedCard && ghostPos && (
           <div
-            className={styles.ghostPreview}
+            className={`${styles.ghostPreview} ${ghostPos.valid ? styles.ghostValid : styles.ghostInvalid}`}
             style={{
-              left: toScreen(hoverSlot.x, hoverSlot.y).left,
-              top: toScreen(hoverSlot.x, hoverSlot.y).top,
+              left: toScreen(ghostPos.gx, ghostPos.gy).left,
+              top: toScreen(ghostPos.gx, ghostPos.gy).top,
               width: CELL * 2,
               height: CELL * 2,
             }}
@@ -186,7 +209,9 @@ export default function Board() {
       )}
 
       <div className={styles.hint}>
-        Колёсико — масштаб, перетаскивание — перемещение
+        {selectedCard
+          ? 'Наведи и кликни, чтобы поставить карту'
+          : 'Колёсико — масштаб, перетаскивание — перемещение'}
       </div>
     </div>
   );
