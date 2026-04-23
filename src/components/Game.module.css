@@ -1,0 +1,14 @@
+.gameLayout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #0f0f23;
+  color: #e0e0e0;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.mainArea {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
