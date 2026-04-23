@@ -259,6 +259,37 @@ export const useGameStore = create((set, get) => ({
     set({ selectedCardIndex: null });
   },
 
+  // Перевернуть карту в руке текущего игрока на 180° (2D-поворот в плоскости экрана).
+  // Цвета меняются крест-накрест: TL↔BR, TR↔BL.
+  // ВАЖНО: вызывается Hand'ом ТОЛЬКО после завершения CSS-анимации переворота —
+  // визуал (повёрнутая старая карта) в этот момент уже совпадает с новым состоянием.
+  flipCardInHand: (cardIndex) => {
+    const { players, currentPlayerIndex } = get();
+    const player = players[currentPlayerIndex];
+    if (!player || cardIndex < 0 || cardIndex >= player.hand.length) return;
+
+    const newPlayers = players.map((p, i) => {
+      if (i !== currentPlayerIndex) return p;
+      return {
+        ...p,
+        hand: p.hand.map((card, j) => {
+          if (j !== cardIndex) return card;
+          return {
+            ...card,
+            colors: {
+              tl: card.colors.br,
+              tr: card.colors.bl,
+              bl: card.colors.tr,
+              br: card.colors.tl,
+            },
+          };
+        }),
+      };
+    });
+
+    set({ players: newPlayers });
+  },
+
   // Положить выбранную карту на поле в позицию (x, y)
   placeCard: (x, y) => {
     const state = get();

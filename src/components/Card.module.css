@@ -3,9 +3,16 @@
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  /* transform не анимируем — иначе после снятия .flipping браузер проиграет
+     обратную интерполяцию rotate(180deg) → rotate(0deg). Тень остаётся плавной. */
+  transition: box-shadow 0.15s ease, outline-color 0.15s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
+  transform-origin: center center;
+  /* Подсказка браузеру: готовься к GPU-композитингу transform — важно для
+     одновременной анимации всех 5 карт без лагов. */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .card:hover {
@@ -33,4 +40,41 @@
   position: absolute;
   box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* ===== АНИМАЦИЯ ПЕРЕВОРОТА КАРТЫ (2D, 180°) ===== */
+/* Это плоский поворот в плоскости экрана, а не 3D-флип:
+   углы визуально меняются местами (TL↔BR, TR↔BL) — ровно то,
+   что потом применится в данных store'а после завершения анимации. */
+.flipping {
+  animation: cardFlip 0.4s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+  /* Во время анимации выводим карту выше соседей и отключаем клики,
+     чтобы случайный клик не сбил процесс. */
+  z-index: 5;
+  pointer-events: none;
+}
+
+@keyframes cardFlip {
+  /* 1. Приподнимаем — «карта отрывается от руки» */
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  30% {
+    transform: translateY(-10px) scale(1.08) rotate(0deg);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4);
+  }
+  /* 2. Поворот на 180° пока карта «висит в воздухе» */
+  70% {
+    transform: translateY(-10px) scale(1.08) rotate(180deg);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4);
+  }
+  /* 3. «Ложится» обратно — уже перевёрнутой.
+        Финальный rotate(180deg) фиксируется fill-mode: forwards и держится
+        до того момента, когда React в том же коммите снимет класс и свапнет
+        данные в store — визуально состояния совпадают, скачка нет. */
+  100% {
+    transform: translateY(0) scale(1) rotate(180deg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
 }

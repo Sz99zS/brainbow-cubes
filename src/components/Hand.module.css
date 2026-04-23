@@ -32,3 +32,58 @@
   font-style: italic;
   font-size: 14px;
 }
+
+/* ===== КНОПКИ ПЕРЕВОРОТА ===== */
+.flipBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.flipBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.flipBtn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.flipBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.flipIcon {
+  font-size: 18px;
+  line-height: 1;
+  display: inline-block;
+}
+
+.flipLabel {
+  white-space: nowrap;
+}
+
+/* Акцентный стиль для «Перевернуть ВСЕ» — более заметная кнопка */
+.flipAllBtn {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #cfe2ff;
+}
+
+.flipAllBtn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.8);
+}
