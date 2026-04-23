@@ -33,7 +33,8 @@ export default function Hand() {
             <Card
               key={card.id}
               card={card}
-              size={48}
+              cellWidth={56}
+              cellHeight={40}
               selected={selectedCardIndex === i}
               onClick={() => handleClick(i)}
             />

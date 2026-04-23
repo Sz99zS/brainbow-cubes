@@ -5,7 +5,10 @@ import { useGameStore, checkValidMove } from '@/store/useGameStore';
 import { COLOR_HEX } from '@/data/deck';
 import styles from './Board.module.css';
 
-const CELL = 60; // размер одной ячейки в px
+// Размеры одной ячейки в пикселях (прямоугольная, вытянута по горизонтали)
+// Карта 2×2 = 130×100 px
+const CW = 70; // ширина ячейки
+const CH = 50; // высота ячейки
 
 // Порог в пикселях: если мышь сдвинулась меньше — это клик, иначе — перетаскивание
 const DRAG_THRESHOLD = 5;
@@ -38,14 +41,14 @@ export default function Board() {
   // === GHOST: позиция призрака в игровых координатах ===
   const [ghostPos, setGhostPos] = useState(null); // { gx, gy, valid }
 
-  // Центрирование при первом рендере
+  // Центрирование при первом рендере — сдвигаем так, чтобы карта (0,0) была в центре экрана
   const initialized = useRef(false);
   useLayoutEffect(() => {
     if (!initialized.current && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       setPan({
-        x: rect.width / 2 - CELL,
-        y: rect.height / 2 - CELL,
+        x: rect.width / 2 - CW,  // половина ширины карты
+        y: rect.height / 2 - CH,  // половина высоты карты
       });
       initialized.current = true;
     }
@@ -55,7 +58,8 @@ export default function Board() {
   const popupKey = placedCards.length;
 
   // --- Конвертация пикселей мыши → игровых координат ---
-  // Привязка к сетке с шагом в 1 ячейку (не 2!), курсор в центре карты 2×2
+  // Привязка к сетке с шагом в 1 ячейку, курсор в центре карты 2×2
+  // Ось X привязывается по CW, ось Y — по CH (разные шаги!)
   const mouseToGrid = useCallback(
     (clientX, clientY) => {
       if (!containerRef.current) return null;
@@ -66,9 +70,9 @@ export default function Board() {
       const layerY = (clientY - rect.top - pan.y) / zoom;
 
       // Привязываем к сетке; смещаем на -1, чтобы курсор был в центре карты 2×2
-      // toScreen: left = gx * CELL, top = -gy * CELL
-      const gx = Math.round(layerX / CELL) - 1;
-      const gy = -(Math.round(layerY / CELL) - 1);
+      // toScreen: left = gx * CW, top = -gy * CH
+      const gx = Math.round(layerX / CW) - 1;
+      const gy = -(Math.round(layerY / CH) - 1);
 
       return { gx, gy };
     },
@@ -142,10 +146,10 @@ export default function Board() {
   }, []);
 
   // Конвертация игровых координат → экранные пиксели
-  // y инвертируется: в игре y вверх, на экране y вниз
+  // X масштабируется по CW, Y по CH (и инвертируется: в игре y вверх, на экране y вниз)
   const toScreen = (gx, gy) => ({
-    left: gx * CELL,
-    top: -gy * CELL,
+    left: gx * CW,
+    top: -gy * CH,
   });
 
   return (
@@ -172,12 +176,13 @@ export default function Board() {
             <div
               key={card.id}
               className={styles.placedCard}
-              style={{ left, top, width: CELL * 2, height: CELL * 2 }}
+              style={{ left, top, width: CW * 2, height: CH * 2 }}
             >
-              <div className={styles.placedCell} style={{ width: CELL, height: CELL, top: 0, left: 0, backgroundColor: COLOR_HEX[card.colors.tl] }} />
-              <div className={styles.placedCell} style={{ width: CELL, height: CELL, top: 0, left: CELL, backgroundColor: COLOR_HEX[card.colors.tr] }} />
-              <div className={styles.placedCell} style={{ width: CELL, height: CELL, top: CELL, left: 0, backgroundColor: COLOR_HEX[card.colors.bl] }} />
-              <div className={styles.placedCell} style={{ width: CELL, height: CELL, top: CELL, left: CELL, backgroundColor: COLOR_HEX[card.colors.br] }} />
+              {/* Ячейки: ширина = CW, высота = CH, смещения соответственно */}
+              <div className={styles.placedCell} style={{ width: CW, height: CH, top: 0, left: 0, backgroundColor: COLOR_HEX[card.colors.tl] }} />
+              <div className={styles.placedCell} style={{ width: CW, height: CH, top: 0, left: CW, backgroundColor: COLOR_HEX[card.colors.tr] }} />
+              <div className={styles.placedCell} style={{ width: CW, height: CH, top: CH, left: 0, backgroundColor: COLOR_HEX[card.colors.bl] }} />
+              <div className={styles.placedCell} style={{ width: CW, height: CH, top: CH, left: CW, backgroundColor: COLOR_HEX[card.colors.br] }} />
             </div>
           );
         })}
@@ -189,14 +194,14 @@ export default function Board() {
             style={{
               left: toScreen(ghostPos.gx, ghostPos.gy).left,
               top: toScreen(ghostPos.gx, ghostPos.gy).top,
-              width: CELL * 2,
-              height: CELL * 2,
+              width: CW * 2,
+              height: CH * 2,
             }}
           >
-            <div className={styles.ghostCell} style={{ width: CELL, height: CELL, top: 0, left: 0, backgroundColor: COLOR_HEX[selectedCard.colors.tl] }} />
-            <div className={styles.ghostCell} style={{ width: CELL, height: CELL, top: 0, left: CELL, backgroundColor: COLOR_HEX[selectedCard.colors.tr] }} />
-            <div className={styles.ghostCell} style={{ width: CELL, height: CELL, top: CELL, left: 0, backgroundColor: COLOR_HEX[selectedCard.colors.bl] }} />
-            <div className={styles.ghostCell} style={{ width: CELL, height: CELL, top: CELL, left: CELL, backgroundColor: COLOR_HEX[selectedCard.colors.br] }} />
+            <div className={styles.ghostCell} style={{ width: CW, height: CH, top: 0, left: 0, backgroundColor: COLOR_HEX[selectedCard.colors.tl] }} />
+            <div className={styles.ghostCell} style={{ width: CW, height: CH, top: 0, left: CW, backgroundColor: COLOR_HEX[selectedCard.colors.tr] }} />
+            <div className={styles.ghostCell} style={{ width: CW, height: CH, top: CH, left: 0, backgroundColor: COLOR_HEX[selectedCard.colors.bl] }} />
+            <div className={styles.ghostCell} style={{ width: CW, height: CH, top: CH, left: CW, backgroundColor: COLOR_HEX[selectedCard.colors.br] }} />
           </div>
         )}
       </div>

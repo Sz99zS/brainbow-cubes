@@ -3,29 +3,30 @@
 import { COLOR_HEX } from '@/data/deck';
 import styles from './Card.module.css';
 
-// Компонент карты 2×2
-// Используется в руке игрока и на игровом поле
+// Компонент карты 2×2 с прямоугольными ячейками
+// Используется в руке игрока (Hand) — размеры передаются через пропсы
 export default function Card({
   card,
-  size = 60,        // размер одной ячейки в px
+  cellWidth = 70,    // ширина одной ячейки в px
+  cellHeight = 50,   // высота одной ячейки в px
   selected = false,
-  ghost = false,     // полупрозрачный призрак для превью
   onClick,
 }) {
-  const total = size * 2;
+  const totalW = cellWidth * 2;
+  const totalH = cellHeight * 2;
 
   return (
     <div
-      className={`${styles.card} ${selected ? styles.selected : ''} ${ghost ? styles.ghost : ''}`}
-      style={{ width: total, height: total }}
+      className={`${styles.card} ${selected ? styles.selected : ''}`}
+      style={{ width: totalW, height: totalH }}
       onClick={onClick}
     >
       {/* TL — левый верхний */}
       <div
         className={styles.cell}
         style={{
-          width: size,
-          height: size,
+          width: cellWidth,
+          height: cellHeight,
           backgroundColor: COLOR_HEX[card.colors.tl],
           top: 0,
           left: 0,
@@ -35,21 +36,21 @@ export default function Card({
       <div
         className={styles.cell}
         style={{
-          width: size,
-          height: size,
+          width: cellWidth,
+          height: cellHeight,
           backgroundColor: COLOR_HEX[card.colors.tr],
           top: 0,
-          left: size,
+          left: cellWidth,
         }}
       />
       {/* BL — левый нижний */}
       <div
         className={styles.cell}
         style={{
-          width: size,
-          height: size,
+          width: cellWidth,
+          height: cellHeight,
           backgroundColor: COLOR_HEX[card.colors.bl],
-          top: size,
+          top: cellHeight,
           left: 0,
         }}
       />
@@ -57,11 +58,11 @@ export default function Card({
       <div
         className={styles.cell}
         style={{
-          width: size,
-          height: size,
+          width: cellWidth,
+          height: cellHeight,
           backgroundColor: COLOR_HEX[card.colors.br],
-          top: size,
-          left: size,
+          top: cellHeight,
+          left: cellWidth,
         }}
       />
     </div>
